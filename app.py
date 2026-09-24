@@ -79,10 +79,19 @@ if source and st.button("Start transcription", type="primary", use_container_wid
                     st.error("Spotify links are DRM-protected and cannot be downloaded for transcription. Use an uploaded audio file, YouTube URL, or direct audio URL instead.")
                     st.stop()
                 import yt_dlp
-                options = {"format":"bestaudio/best", "outtmpl":str(path) + ".%(ext)s"}
+                options = {
+                    "format": "bestaudio/best",
+                    "outtmpl": str(path) + ".%(ext)s",
+                    "noplaylist": True,
+                    "quiet": True,
+                    "extractor_args": {"youtube": {"player_client": ["web_safari", "android_vr"]}},
+                }
                 with yt_dlp.YoutubeDL(options) as ydl:
                     ydl.download([source])
-                path = next(Path(folder).glob("audio.*"))
+                files = list(Path(folder).glob("audio.*"))
+                if not files:
+                    raise RuntimeError("No audio stream was downloaded from this URL.")
+                path = files[0]
 
             with st.spinner(f"Loading {model_name} model..."):
                 model = whisper.load_model(model_name)
@@ -103,11 +112,14 @@ if source and st.button("Start transcription", type="primary", use_container_wid
                     data = next(output.glob(f"*.{fmt}")).read_text(encoding="utf-8")
                 col.download_button(f"Download {fmt.upper()}", data, f"transcript.{fmt}", mime=mime, use_container_width=True)
     except Exception as exc:
-        st.error(f"Transcription failed: {exc}")
+        message = str(exc)
+        if "403" in message and "youtube" in source.lower():
+            message = "YouTube rejected the hosted download request (HTTP 403). Try uploading the audio file or use a direct audio URL."
+        st.error(f"Transcription failed: {message}")
 
 st.markdown("""
 <div style="height:45px"></div>
-<div class="hero"><h2>Everything you need to work with voice.</h2><p>Simple tools for turning recordings, meetings, lectures, and videos into useful text.</p></div>
+<div class="hero"><h2>Everything you need to work with voice.</h2><p>Simple tools for turning recordings, lectures, and videos into useful text.</p></div>
 """, unsafe_allow_html=True)
 
 c1, c2, c3 = st.columns(3)
