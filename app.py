@@ -35,19 +35,12 @@ button[kind="primary"] { border-radius:9px; }
 </style>
 """, unsafe_allow_html=True)
 
-bars = [22, 38, 62, 30, 76, 46, 92, 34, 68, 48, 82, 28, 60, 42, 96, 35, 72, 50, 88, 30, 66, 44, 78, 36, 58, 42, 90, 28, 70, 48, 84, 32]
+bars = [22,38,62,30,76,46,92,34,68,48,82,28,60,42,96,35,72,50,88,30,66,44,78,36,58,42,90,28,70,48,84,32]
 wave = "".join(f'<div class="bar" style="height:{h}%"></div>' for h in bars)
 
 st.markdown(f"""
-<div class="nav">
-  <div class="logo">Kra<span>Voice</span></div>
-  <div class="navlinks">Home &nbsp;&nbsp;&nbsp; How it works &nbsp;&nbsp;&nbsp; Features &nbsp;&nbsp;&nbsp; Pricing</div>
-  <div class="cta">Get Started</div>
-</div>
-<div class="hero">
-  <h1>Turn spoken words into <b>smart text.</b></h1>
-  <p>AI-powered transcription that listens, understands, and turns your audio into accurate text in seconds.</p>
-</div>
+<div class="nav"><div class="logo">Kra<span>Voice</span></div><div class="navlinks">Home &nbsp;&nbsp;&nbsp; How it works &nbsp;&nbsp;&nbsp; Features &nbsp;&nbsp;&nbsp; Pricing</div><div class="cta">Get Started</div></div>
+<div class="hero"><h1>Turn spoken words into <b>smart text.</b></h1><p>AI-powered transcription that listens, understands, and turns your audio into accurate text in seconds.</p></div>
 <div class="wave">{wave}</div>
 """, unsafe_allow_html=True)
 
@@ -56,22 +49,19 @@ left, right = st.columns([1.6, 1])
 with left:
     st.markdown('<div class="section-title">Transcribe your audio</div><div class="section-copy">Upload a file or paste a YouTube / direct audio URL.</div>', unsafe_allow_html=True)
     mode = st.radio("Input", ["Upload audio", "Audio URL"], horizontal=True, label_visibility="collapsed")
-    if mode == "Upload audio":
-        source = st.file_uploader("Drop audio here", type=["mp3", "wav", "m4a", "mp4", "mpeg", "webm"])
-    else:
-        source = st.text_input("YouTube or direct audio URL", placeholder="https://youtube.com/... or https://example.com/audio.mp3")
+    source = st.file_uploader("Drop audio here", type=["mp3","wav","m4a","mp4","mpeg","webm"]) if mode == "Upload audio" else st.text_input("YouTube or direct audio URL", placeholder="https://youtube.com/... or https://example.com/audio.mp3")
 with right:
     st.markdown('<div class="section-title">Whisper model</div><div class="section-copy">Choose speed or accuracy.</div>', unsafe_allow_html=True)
-    model_name = st.selectbox("Model", ["tiny", "base", "small", "medium", "large"], index=1, label_visibility="collapsed")
+    model_name = st.selectbox("Model", ["tiny","base","small","medium","large"], index=1, label_visibility="collapsed")
     st.caption("Larger models generally improve accuracy but need more memory and time.")
 st.markdown('</div>', unsafe_allow_html=True)
-st.write("")
 
 if source and st.button("Start transcription", type="primary", use_container_width=True):
     try:
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "audio"
             result = None
+            youtube = False
 
             if mode == "Upload audio":
                 path = path.with_suffix(Path(source.name).suffix)
@@ -79,37 +69,25 @@ if source and st.button("Start transcription", type="primary", use_container_wid
             else:
                 host = urlparse(source).netloc.lower()
                 if "spotify.com" in host:
-                    st.error("Spotify links are DRM-protected and cannot be downloaded. Use an uploaded audio file, YouTube URL, or direct audio URL.")
+                    st.error("Spotify links are DRM-protected. Upload the audio file or use a supported direct audio URL.")
                     st.stop()
 
-                is_youtube = "youtube.com" in host or "youtu.be" in host
-                if is_youtube:
+                youtube = "youtube.com" in host or "youtu.be" in host
+                if youtube:
                     match = re.search(r"(?:v=|youtu\.be/|shorts/)([\w-]{11})", source)
                     video_id = match.group(1) if match else parse_qs(urlparse(source).query).get("v", [""])[0]
-                    if video_id:
-                        try:
-                            from youtube_transcript_api import YouTubeTranscriptApi
-                            transcript = YouTubeTranscriptApi().fetch(video_id)
-                            result = {
-                                "language": getattr(transcript, "language_code", "unknown"),
-                                "segments": [
-                                    {"start": s.start, "end": s.start + s.duration, "text": s.text}
-                                    for s in transcript.snippets
-                                ],
-                            }
-                            result["text"] = " ".join(s["text"] for s in result["segments"])
-                        except Exception:
-                            pass
-
-                if result is None:
+                    if not video_id:
+                        raise RuntimeError("Could not read the YouTube video ID.")
+                    try:
+                        from youtube_transcript_api import YouTubeTranscriptApi
+                        transcript = YouTubeTranscriptApi().fetch(video_id)
+                        result = {"language": transcript.language_code, "segments": [{"start": s.start, "end": s.start + s.duration, "text": s.text} for s in transcript.snippets]}
+                        result["text"] = " ".join(s["text"] for s in result["segments"])
+                    except Exception as exc:
+                        raise RuntimeError("YouTube captions could not be accessed from this hosted app. Streamlit Cloud uses a cloud IP that YouTube may block. Upload the audio file, use a direct audio URL, or run KraVoice locally for YouTube audio downloads.") from exc
+                else:
                     import yt_dlp
-                    options = {
-                        "format": "bestaudio/best",
-                        "outtmpl": str(path) + ".%(ext)s",
-                        "noplaylist": True,
-                        "quiet": True,
-                        "extractor_args": {"youtube": {"player_client": ["web_safari", "android_vr"]}},
-                    }
+                    options = {"format":"bestaudio/best", "outtmpl":str(path)+".%(ext)s", "noplaylist":True, "quiet":True}
                     with yt_dlp.YoutubeDL(options) as ydl:
                         ydl.download([source])
                     files = list(Path(folder).glob("audio.*"))
@@ -127,34 +105,27 @@ if source and st.button("Start transcription", type="primary", use_container_wid
             st.text_area("Transcript", result["text"].strip(), height=320)
 
             cols = st.columns(3)
-            for col, fmt, mime in zip(cols, ["txt", "srt", "vtt"], ["text/plain", "text/plain", "text/vtt"]):
-                if fmt == "txt":
-                    data = result["text"].strip()
-                else:
-                    output = Path(folder) / fmt
-                    output.mkdir()
-                    get_writer(fmt, str(output))(result, str(path) if path.exists() else "youtube")
-                    files = list(output.glob(f"*.{fmt}"))
-                    data = files[0].read_text(encoding="utf-8") if files else result["text"].strip()
-                col.download_button(f"Download {fmt.upper()}", data, f"transcript.{fmt}", mime=mime, use_container_width=True)
+            if youtube:
+                def stamp(t, comma=True):
+                    h, t = divmod(t, 3600); m, t = divmod(t, 60); s, ms = divmod(t, 1)
+                    return f"{int(h):02}:{int(m):02}:{int(s):02}{',' if comma else '.'}{int(ms*1000):03}"
+                srt = "\n\n".join(f"{i}\n{stamp(x['start'])} --> {stamp(x['end'])}\n{x['text']}" for i, x in enumerate(result["segments"], 1))
+                vtt = "WEBVTT\n\n" + srt.replace(",", ".")
+                downloads = [("TXT", result["text"].strip(), "text/plain"),("SRT",srt,"text/plain"),("VTT",vtt,"text/vtt")]
+            else:
+                downloads = []
+                for fmt in ["txt","srt","vtt"]:
+                    if fmt == "txt": data = result["text"].strip()
+                    else:
+                        output = Path(folder) / fmt; output.mkdir(); get_writer(fmt, str(output))(result, str(path)); files = list(output.glob(f"*.{fmt}")); data = files[0].read_text(encoding="utf-8")
+                    downloads.append((fmt.upper(), data, "text/vtt" if fmt == "vtt" else "text/plain"))
+            for col, (name, data, mime) in zip(cols, downloads):
+                col.download_button(f"Download {name}", data, f"transcript.{name.lower()}", mime=mime, use_container_width=True)
     except Exception as exc:
-        message = str(exc)
-        if "403" in message:
-            message = "YouTube rejected the hosted download request (HTTP 403). This can happen with current YouTube anti-bot rules. Try a video with captions, upload the audio file, or use a direct audio URL."
-        st.error(f"Transcription failed: {message}")
+        st.error(f"Transcription failed: {exc}")
 
-st.markdown("""
-<div style="height:45px"></div>
-<div class="hero"><h2>Everything you need to work with voice.</h2><p>Simple tools for turning recordings, lectures, and videos into useful text.</p></div>
-""", unsafe_allow_html=True)
-
+st.markdown('<div style="height:45px"></div><div class="hero"><h2>Everything you need to work with voice.</h2><p>Simple tools for turning recordings, lectures, and videos into useful text.</p></div>', unsafe_allow_html=True)
 c1, c2, c3 = st.columns(3)
-for col, title, text in [
-    (c1, "Fast transcription", "Whisper-powered speech recognition with selectable model sizes."),
-    (c2, "Multiple formats", "Export clean transcripts as TXT, SRT, or VTT subtitles."),
-    (c3, "Simple workflow", "Upload audio or use a supported URL and get your transcript in one place."),
-]:
-    with col:
-        st.markdown(f'<div class="feature"><h3>{title}</h3><p>{text}</p></div>', unsafe_allow_html=True)
-
+for col, title, text in [(c1,"Fast transcription","Whisper-powered speech recognition with selectable model sizes."),(c2,"Multiple formats","Export clean transcripts as TXT, SRT, or VTT subtitles."),(c3,"Simple workflow","Upload audio or use a supported URL and get your transcript in one place.")]:
+    with col: st.markdown(f'<div class="feature"><h3>{title}</h3><p>{text}</p></div>', unsafe_allow_html=True)
 st.markdown('<footer>KraVoice · AI audio transcription by Kraverse</footer>', unsafe_allow_html=True)
