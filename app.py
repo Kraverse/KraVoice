@@ -1,3 +1,5 @@
+import tempfile
+
 import streamlit as st
 import whisper
 
@@ -11,10 +13,14 @@ audio = st.file_uploader("Upload audio", type=["mp3", "wav", "m4a", "mp4", "mpeg
 if audio:
     st.audio(audio)
     if st.button("Transcribe", type="primary"):
-        with st.spinner("Loading Whisper model..."):
-            model = whisper.load_model(model_name)
-        with st.spinner("Transcribing audio..."):
-            result = model.transcribe(audio.name if False else audio.getvalue())
+        with tempfile.NamedTemporaryFile(suffix=".audio") as file:
+            file.write(audio.getvalue())
+            file.flush()
+            with st.spinner("Loading Whisper model..."):
+                model = whisper.load_model(model_name)
+            with st.spinner("Transcribing audio..."):
+                result = model.transcribe(file.name)
+
         text = result["text"].strip()
         st.subheader("Transcript")
         st.text_area("", text, height=300)
