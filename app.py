@@ -13,11 +13,6 @@ st.caption("AI audio transcription powered by Whisper")
 def load_model(name):
     return whisper.load_model(name)
 
-
-def transcribe(path, model):
-    return model.transcribe(path)
-
-
 mode = st.sidebar.radio("Input mode", ["Upload audio", "Audio URL"])
 model_name = st.sidebar.selectbox("Whisper model", ["tiny", "base", "small", "medium", "large"], index=1)
 
@@ -35,14 +30,15 @@ if source and st.button("Transcribe", type="primary"):
                 path.write_bytes(source.getvalue())
             else:
                 import yt_dlp
-                with yt_dlp.YoutubeDL({"format": "bestaudio/best", "outtmpl": str(path) + ".%(ext)s"}) as ydl:
+                options = {"format": "bestaudio/best", "outtmpl": str(path) + ".%(ext)s"}
+                with yt_dlp.YoutubeDL(options) as ydl:
                     ydl.download([source])
                 path = next(Path(folder).glob("audio.*"))
 
             with st.spinner(f"Loading {model_name} model..."):
                 model = load_model(model_name)
             with st.spinner("Transcribing audio..."):
-                result = transcribe(str(path), model)
+                result = model.transcribe(str(path))
 
             st.success(f"Detected language: {result['language']}")
             st.text_area("Transcript", result["text"].strip(), height=320)
@@ -52,6 +48,7 @@ if source and st.button("Transcribe", type="primary"):
                     data = result["text"].strip()
                 else:
                     output = Path(folder) / fmt
+                    output.mkdir()
                     get_writer(fmt, str(output))(result, str(path))
                     data = next(output.glob(f"*.{fmt}")).read_text(encoding="utf-8")
                 st.download_button(f"Download {fmt.upper()}", data, f"transcript.{fmt}", mime=mime)
