@@ -1,5 +1,6 @@
 import tempfile
 from pathlib import Path
+from urllib.parse import urlparse
 
 import streamlit as st
 import whisper
@@ -9,8 +10,8 @@ st.set_page_config(page_title="KraVoice", page_icon="🎙️", layout="wide")
 
 st.markdown("""
 <style>
-.stApp { background: #050505; color: #f5f5f5; }
-.block-container { max-width: 1100px; padding: 2rem 2rem 4rem; }
+.stApp { background:#050505; color:#f5f5f5; }
+.block-container { max-width:1100px; padding:2rem 2rem 4rem; }
 .nav { display:flex; justify-content:space-between; align-items:center; padding:8px 0 55px; }
 .logo { font-size:24px; font-weight:700; letter-spacing:-1px; }
 .logo span { color:#a78bfa; }
@@ -52,17 +53,16 @@ st.markdown(f"""
 st.markdown('<div class="panel">', unsafe_allow_html=True)
 left, right = st.columns([1.6, 1])
 with left:
-    st.markdown('<div class="section-title">Transcribe your audio</div><div class="section-copy">Upload a file or paste an audio / YouTube URL.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Transcribe your audio</div><div class="section-copy">Upload a file or paste a YouTube / direct audio URL.</div>', unsafe_allow_html=True)
     mode = st.radio("Input", ["Upload audio", "Audio URL"], horizontal=True, label_visibility="collapsed")
     if mode == "Upload audio":
         source = st.file_uploader("Drop audio here", type=["mp3", "wav", "m4a", "mp4", "mpeg", "webm"])
     else:
-        source = st.text_input("Audio or YouTube URL", placeholder="https://...")
+        source = st.text_input("YouTube or direct audio URL", placeholder="https://youtube.com/... or https://example.com/audio.mp3")
 with right:
     st.markdown('<div class="section-title">Whisper model</div><div class="section-copy">Choose speed or accuracy.</div>', unsafe_allow_html=True)
     model_name = st.selectbox("Model", ["tiny", "base", "small", "medium", "large"], index=1, label_visibility="collapsed")
     st.caption("Larger models generally improve accuracy but need more memory and time.")
-
 st.markdown('</div>', unsafe_allow_html=True)
 st.write("")
 
@@ -74,8 +74,12 @@ if source and st.button("Start transcription", type="primary", use_container_wid
                 path = path.with_suffix(Path(source.name).suffix)
                 path.write_bytes(source.getvalue())
             else:
+                host = urlparse(source).netloc.lower()
+                if "spotify.com" in host:
+                    st.error("Spotify links are DRM-protected and cannot be downloaded for transcription. Use an uploaded audio file, YouTube URL, or direct audio URL instead.")
+                    st.stop()
                 import yt_dlp
-                options = {"format": "bestaudio/best", "outtmpl": str(path) + ".%(ext)s"}
+                options = {"format":"bestaudio/best", "outtmpl":str(path) + ".%(ext)s"}
                 with yt_dlp.YoutubeDL(options) as ydl:
                     ydl.download([source])
                 path = next(Path(folder).glob("audio.*"))
@@ -110,7 +114,7 @@ c1, c2, c3 = st.columns(3)
 for col, title, text in [
     (c1, "Fast transcription", "Whisper-powered speech recognition with selectable model sizes."),
     (c2, "Multiple formats", "Export clean transcripts as TXT, SRT, or VTT subtitles."),
-    (c3, "Simple workflow", "Upload audio or use a URL and get your transcript in one place."),
+    (c3, "Simple workflow", "Upload audio or use a supported URL and get your transcript in one place."),
 ]:
     with col:
         st.markdown(f'<div class="feature"><h3>{title}</h3><p>{text}</p></div>', unsafe_allow_html=True)
