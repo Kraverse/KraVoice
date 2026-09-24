@@ -1,6 +1,7 @@
+import re
 import tempfile
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import streamlit as st
 import whisper
@@ -70,33 +71,57 @@ if source and st.button("Start transcription", type="primary", use_container_wid
     try:
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "audio"
+            result = None
+
             if mode == "Upload audio":
                 path = path.with_suffix(Path(source.name).suffix)
                 path.write_bytes(source.getvalue())
             else:
                 host = urlparse(source).netloc.lower()
                 if "spotify.com" in host:
-                    st.error("Spotify links are DRM-protected and cannot be downloaded for transcription. Use an uploaded audio file, YouTube URL, or direct audio URL instead.")
+                    st.error("Spotify links are DRM-protected and cannot be downloaded. Use an uploaded audio file, YouTube URL, or direct audio URL.")
                     st.stop()
-                import yt_dlp
-                options = {
-                    "format": "bestaudio/best",
-                    "outtmpl": str(path) + ".%(ext)s",
-                    "noplaylist": True,
-                    "quiet": True,
-                    "extractor_args": {"youtube": {"player_client": ["web_safari", "android_vr"]}},
-                }
-                with yt_dlp.YoutubeDL(options) as ydl:
-                    ydl.download([source])
-                files = list(Path(folder).glob("audio.*"))
-                if not files:
-                    raise RuntimeError("No audio stream was downloaded from this URL.")
-                path = files[0]
 
-            with st.spinner(f"Loading {model_name} model..."):
-                model = whisper.load_model(model_name)
-            with st.spinner("Transcribing audio..."):
-                result = model.transcribe(str(path))
+                is_youtube = "youtube.com" in host or "youtu.be" in host
+                if is_youtube:
+                    match = re.search(r"(?:v=|youtu\.be/|shorts/)([\w-]{11})", source)
+                    video_id = match.group(1) if match else parse_qs(urlparse(source).query).get("v", [""])[0]
+                    if video_id:
+                        try:
+                            from youtube_transcript_api import YouTubeTranscriptApi
+                            transcript = YouTubeTranscriptApi().fetch(video_id)
+                            result = {
+                                "language": getattr(transcript, "language_code", "unknown"),
+                                "segments": [
+                                    {"start": s.start, "end": s.start + s.duration, "text": s.text}
+                                    for s in transcript.snippets
+                                ],
+                            }
+                            result["text"] = " ".join(s["text"] for s in result["segments"])
+                        except Exception:
+                            pass
+
+                if result is None:
+                    import yt_dlp
+                    options = {
+                        "format": "bestaudio/best",
+                        "outtmpl": str(path) + ".%(ext)s",
+                        "noplaylist": True,
+                        "quiet": True,
+                        "extractor_args": {"youtube": {"player_client": ["web_safari", "android_vr"]}},
+                    }
+                    with yt_dlp.YoutubeDL(options) as ydl:
+                        ydl.download([source])
+                    files = list(Path(folder).glob("audio.*"))
+                    if not files:
+                        raise RuntimeError("No audio stream was downloaded from this URL.")
+                    path = files[0]
+
+            if result is None:
+                with st.spinner(f"Loading {model_name} model..."):
+                    model = whisper.load_model(model_name)
+                with st.spinner("Transcribing audio..."):
+                    result = model.transcribe(str(path))
 
             st.success(f"Detected language: {result['language']}")
             st.text_area("Transcript", result["text"].strip(), height=320)
@@ -108,13 +133,14 @@ if source and st.button("Start transcription", type="primary", use_container_wid
                 else:
                     output = Path(folder) / fmt
                     output.mkdir()
-                    get_writer(fmt, str(output))(result, str(path))
-                    data = next(output.glob(f"*.{fmt}")).read_text(encoding="utf-8")
+                    get_writer(fmt, str(output))(result, str(path) if path.exists() else "youtube")
+                    files = list(output.glob(f"*.{fmt}"))
+                    data = files[0].read_text(encoding="utf-8") if files else result["text"].strip()
                 col.download_button(f"Download {fmt.upper()}", data, f"transcript.{fmt}", mime=mime, use_container_width=True)
     except Exception as exc:
         message = str(exc)
-        if "403" in message and "youtube" in source.lower():
-            message = "YouTube rejected the hosted download request (HTTP 403). Try uploading the audio file or use a direct audio URL."
+        if "403" in message:
+            message = "YouTube rejected the hosted download request (HTTP 403). This can happen with current YouTube anti-bot rules. Try a video with captions, upload the audio file, or use a direct audio URL."
         st.error(f"Transcription failed: {message}")
 
 st.markdown("""
