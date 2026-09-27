@@ -4,6 +4,8 @@ primaryColor = "#a78bfa"
 backgroundColor = "#050505"
 secondaryBackgroundColor = "#141414"
 textColor = "#f2f2f2"
+linkColor = "#111111"
+linkUnderline = false
 font = "sans serif"
 
 [server]

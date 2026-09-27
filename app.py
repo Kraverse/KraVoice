@@ -33,13 +33,17 @@ html{scroll-behavior:smooth;}
 .navlinks span{color:var(--muted);font-size:12.5px;padding:7px 14px;border-radius:999px;transition:color .2s var(--ease),background .2s var(--ease);}
 .navlinks span:hover{color:var(--text);background:rgba(255,255,255,.05);}
 .navlinks a{color:inherit;text-decoration:none;}
-.navcta{background:#fff;color:#111!important;text-decoration:none!important;font-size:13px;font-weight:600;padding:10px 20px;border-radius:999px;
+.navcta{background:#fff;color:#111!important;text-decoration:none!important;font-size:13px;font-weight:600;padding:10px 20px;border-radius:999px;display:inline-block;line-height:1.2;box-shadow:none!important;
   transition:transform .2s var(--ease),box-shadow .2s var(--ease);white-space:nowrap;}
-.navcta:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(255,255,255,.12);}
+.navcta:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(255,255,255,.12)!important;}
+.stApp a[href^="#"], .stApp a[href^="data:"]{color:inherit;}
+div[data-testid="stMarkdownContainer"] a[class]{color:inherit;}
 @media(max-width:760px){.navlinks{display:none;}}
 
 /* ---------- hero ---------- */
 .hero{text-align:center;padding:12px 0 8px;position:relative;}
+.hero a, a.btn-primary, a.btn-ghost, a.navcta{color:#111;text-decoration:none;}
+a.btn-ghost{color:var(--text)!important;}
 .hero h1{font-size:clamp(34px,5.4vw,58px);line-height:1.1;letter-spacing:-1.8px;font-weight:600;
   margin:0 auto 18px;max-width:760px;color:var(--text);}
 .hero h1 b{color:var(--accent);font-weight:600;}
