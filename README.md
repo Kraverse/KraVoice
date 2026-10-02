@@ -96,22 +96,17 @@ KraVoice/
 └── requirements.txt
 ```
 
-## ⚠️ YouTube Note
+## ⚠️ Usage Notes
 
-YouTube can restrict media downloads from cloud-hosted environments with HTTP 403 responses. KraVoice therefore attempts accessible YouTube captions first. Uploaded audio and supported direct audio URLs remain available for Whisper transcription.
+YouTube can restrict media downloads from cloud-hosted environments with HTTP 403 responses. KraVoice attempts accessible YouTube captions first. Uploaded audio and supported direct audio URLs remain available for Whisper transcription.
 
 Spotify links are not supported because Spotify audio is DRM-protected.
 
-## 📜 License & Attribution
+## 📜 License
 
-KraVoice is based on the functionality of the open-source **AIAudioTranscriber** project by **smaranjitghose**.
+KraVoice is released under the AGPL-3.0 license.
 
-Reference repository:
-https://github.com/smaranjitghose/AIAudioTranscriber
-
-The reference project is licensed under **AGPL-3.0**. This repository retains the applicable license and attribution requirements.
-
-See `LICENSE` for the project license information.
+See `LICENSE` for details.
 
 ## 👨‍💻 Author
 
